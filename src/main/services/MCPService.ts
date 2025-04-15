@@ -173,7 +173,7 @@ class McpService {
       } else if (server.command) {
         let cmd = server.command
 
-        if (server.command === 'npx' || server.command === 'bun' || server.command === 'bunx') {
+        if (server.command === 'npx') {
           cmd = await getBinaryPath('bun')
           Logger.info(`[MCP] Using command: ${cmd}`)
 

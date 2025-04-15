@@ -27,7 +27,7 @@ import { EventEmitter } from 'events'
 import { memoize } from 'lodash'
 
 import { CacheService } from './CacheService'
-import { MCPoAuthClientProvider } from './MCPoAuthClient'
+import { CallBackServer, MCPoAuthClientProvider } from './MCPoAuthClient'
 import { StreamableHTTPClientTransport, type StreamableHTTPClientTransportOptions } from './MCPStreamableHttpClient'
 
 // Generic type for caching wrapped functions
@@ -231,55 +231,60 @@ class McpService {
         throw new Error('Either baseUrl or command must be provided')
       }
     }
-    const transport = await initTransport()
+
+    const handleAuth = async (client: Client, transport: SSEClientTransport | StreamableHTTPClientTransport) => {
+      Logger.info(`[MCP] Starting OAuth flow for server: ${server.name}`)
+      // Create an event emitter for the OAuth callback
+      const events = new EventEmitter()
+
+      // Create a callback server
+      const callbackServer = new CallBackServer({
+        port: authProvider.options.callbackPort,
+        path: authProvider.options.callbackPath || '/oauth/callback',
+        events
+      })
+
+      // Set a timeout to close the callback server
+      const timeoutId = setTimeout(() => {
+        Logger.warn(`[MCP] OAuth flow timed out for server: ${server.name}`)
+        callbackServer.close()
+      }, 300000) // 5 minutes timeout
+
+      try {
+        // Wait for the authorization code
+        const authCode = await callbackServer.waitForAuthCode()
+        Logger.info(`[MCP] Received auth code: ${authCode}`)
+
+        // Complete the OAuth flow
+        await transport.finishAuth(authCode)
+
+        Logger.info(`[MCP] OAuth flow completed for server: ${server.name}`)
+
+        const newTransport = await initTransport()
+        // Try to connect again
+        await client.connect(newTransport)
+
+        Logger.info(`[MCP] Successfully authenticated with server: ${server.name}`)
+      } catch (oauthError) {
+        Logger.error(`[MCP] OAuth authentication failed for server ${server.name}:`, oauthError)
+        throw new Error(
+          `OAuth authentication failed: ${oauthError instanceof Error ? oauthError.message : String(oauthError)}`
+        )
+      } finally {
+        // Clear the timeout and close the callback server
+        clearTimeout(timeoutId)
+        callbackServer.close()
+      }
+    }
 
     try {
+      const transport = await initTransport()
       try {
         await client.connect(transport)
       } catch (error: Error | any) {
         if (error instanceof Error && (error.name === 'UnauthorizedError' || error.message.includes('Unauthorized'))) {
           Logger.info(`[MCP] Authentication required for server: ${server.name}`)
-
-          // Check if this is a remote server with OAuth configuration
-          if (transport instanceof StreamableHTTPClientTransport || transport instanceof SSEClientTransport) {
-            Logger.info(`[MCP] Starting OAuth flow for server: ${server.name}`)
-
-            try {
-              // Create an event emitter for the OAuth callback
-              const events = new EventEmitter()
-
-              // Create a callback server
-              const callbackServer = await authProvider.createCallbackServer({
-                port: authProvider.options.callbackPort,
-                path: authProvider.options.callbackPath || '/oauth/callback',
-                events
-              })
-              // Wait for the authorization code
-              const authCode = await authProvider.waitForAuthCode(events)
-              Logger.info(`[MCP] Received auth code: ${authCode}`)
-
-              // Complete the OAuth flow
-              await transport.finishAuth(authCode)
-
-              Logger.info(`[MCP] OAuth flow completed for server: ${server.name}`)
-
-              const newTransport = await initTransport()
-              // Try to connect again
-              await client.connect(newTransport)
-
-              Logger.info(`[MCP] Successfully authenticated with server: ${server.name}`)
-              // Close the callback server
-              callbackServer.close()
-            } catch (oauthError) {
-              Logger.error(`[MCP] OAuth authentication failed for server ${server.name}:`, oauthError)
-              throw new Error(
-                `OAuth authentication failed: ${oauthError instanceof Error ? oauthError.message : String(oauthError)}`
-              )
-            }
-          } else {
-            Logger.error(`[MCP] Unauthorized error connecting to server ${server.name}:`, error)
-            throw error
-          }
+          await handleAuth(client, transport as SSEClientTransport | StreamableHTTPClientTransport)
         } else {
           throw error
         }

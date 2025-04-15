@@ -122,15 +122,19 @@ export class MCPoAuthClientProvider implements OAuthClientProvider {
   async codeVerifier(): Promise<string> {
     return await readTextFile(this.serverUrlHash, 'code_verifier.txt', 'No code verifier saved for session')
   }
+}
 
-  /**
-   * Creates an HTTP server to handle OAuth callback requests
-   * @param options The server options
-   * @returns The HTTP server instance
-   */
-  async createCallbackServer(options: OAuthCallbackServerOptions): Promise<http.Server> {
+export class CallBackServer {
+  private server: Promise<http.Server>
+  private events: EventEmitter
+
+  constructor(options: OAuthCallbackServerOptions) {
     const { port, path, events } = options
-    // Create a simple HTTP server
+    this.events = events
+    this.server = this.initialize(port, path)
+  }
+
+  initialize(port: number, path: string): Promise<http.Server> {
     const server = http.createServer((req, res) => {
       // Only handle requests to the callback path
       if (req.url?.startsWith(path)) {
@@ -140,7 +144,7 @@ export class MCPoAuthClientProvider implements OAuthClientProvider {
           const code = url.searchParams.get('code')
           if (code) {
             // Emit the code event
-            events.emit('auth-code-received', code)
+            this.events.emit('auth-code-received', code)
           }
         } catch (error) {
           Logger.error('Error processing OAuth callback:', error)
@@ -172,9 +176,18 @@ export class MCPoAuthClientProvider implements OAuthClientProvider {
     return runningServer
   }
 
-  async waitForAuthCode(events: EventEmitter): Promise<string> {
+  get getServer(): Promise<http.Server> {
+    return this.server
+  }
+
+  async close() {
+    const server = await this.server
+    server.close()
+  }
+
+  async waitForAuthCode(): Promise<string> {
     return new Promise((resolve) => {
-      events.once('auth-code-received', (code) => {
+      this.events.once('auth-code-received', (code) => {
         resolve(code)
       })
     })

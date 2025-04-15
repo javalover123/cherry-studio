@@ -125,11 +125,7 @@ class McpService {
       serverUrlHash: crypto
         .createHash('md5')
         .update(server.baseUrl || '')
-        .digest('hex'),
-      callbackPort: 12346,
-      callbackPath: '/oauth/callback',
-      clientName: 'Cherry Studio',
-      clientUri: 'https://github.com/CherryHQ/cherry-studio'
+        .digest('hex')
     })
 
     const initTransport = async (): Promise<

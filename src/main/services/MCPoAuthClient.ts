@@ -32,7 +32,7 @@ export interface OAuthProviderOptions {
   /** Server URL to connect to */
   serverUrlHash: string
   /** Port for the OAuth callback server */
-  callbackPort: number
+  callbackPort?: number
   /** Path for the OAuth callback endpoint */
   callbackPath?: string
   /** Directory to store OAuth credentials */

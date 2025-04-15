@@ -27,7 +27,8 @@ import { EventEmitter } from 'events'
 import { memoize } from 'lodash'
 
 import { CacheService } from './CacheService'
-import { CallBackServer, MCPoAuthClientProvider } from './MCPoAuthClient'
+import { CallBackServer } from './mcp/oauth/callback'
+import { McpOAuthClientProvider } from './mcp/oauth/provider'
 import { StreamableHTTPClientTransport, type StreamableHTTPClientTransportOptions } from './MCPStreamableHttpClient'
 
 // Generic type for caching wrapped functions
@@ -121,7 +122,7 @@ class McpService {
     const args = [...(server.args || [])]
 
     // let transport: StdioClientTransport | SSEClientTransport | InMemoryTransport | StreamableHTTPClientTransport
-    const authProvider = new MCPoAuthClientProvider({
+    const authProvider = new McpOAuthClientProvider({
       serverUrlHash: crypto
         .createHash('md5')
         .update(server.baseUrl || '')
@@ -235,8 +236,8 @@ class McpService {
 
       // Create a callback server
       const callbackServer = new CallBackServer({
-        port: authProvider.options.callbackPort,
-        path: authProvider.options.callbackPath || '/oauth/callback',
+        port: authProvider.config.callbackPort,
+        path: authProvider.config.callbackPath || '/oauth/callback',
         events
       })
 

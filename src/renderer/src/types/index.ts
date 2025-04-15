@@ -380,13 +380,6 @@ export interface MCPConfigSample {
   env?: Record<string, string> | undefined
 }
 
-export interface MCPOAuthConfig {
-  callbackPort?: number
-  callbackPath?: string
-  clientName?: string
-  clientUri?: string
-}
-
 export interface MCPServer {
   id: string
   name: string
@@ -401,7 +394,6 @@ export interface MCPServer {
   disabledTools?: string[] // List of tool names that are disabled for this server
   configSample?: MCPConfigSample
   headers?: Record<string, string> // Custom headers to be sent with requests to this server
-  oauth?: MCPOAuthConfig // OAuth configuration for the server
 }
 
 export interface MCPToolInputSchema {

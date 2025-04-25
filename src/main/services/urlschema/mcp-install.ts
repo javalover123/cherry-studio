@@ -62,13 +62,11 @@ export function handleMcpProtocolUrl(url: URL) {
           installMCPServer(jsonConfig)
         }
       }
-      // TODO send notification or navigate to '/settings/mcp' page
-      // const mainWindow = windowService.getMainWindow()
-      // if (mainWindow && !mainWindow.isDestroyed()) {
-      //   mainWindow.webContents.send('protocol-data', {
-      //     url: '/settings/mcp'
-      //   })
-      // }
+
+      const mainWindow = windowService.getMainWindow()
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.executeJavaScript("window.navigate('/settings/mcp')")
+      }
       break
     }
     default:
